@@ -1,0 +1,118 @@
+---
+title: "Practical Machine Learning Project"
+author: "Loic Le Merlus"
+date: "28 February 2016"
+output: html_document
+---
+###Loading libraries
+```{r , echo=FALSE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+
+```
+
+#Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+#Analysis
+##Preparation
+
+###Loading the data:
+```{r}
+train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA","#DIV/0!",""))
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",na.strings=c("NA","#DIV/0!",""))
+
+# remove variables that are not usefull
+train   <-train[,-c(1:7)]
+test <-test[,-c(1:7)]
+
+
+#set the seed for reproducibility
+set.seed(458776)
+```
+let's clean the data by temoving the column with mostly na
+```{r}
+na_count <-sapply(train, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)/nrow(train)
+na_filter <- (na_count <.95)
+
+smalltrain <- train[,na_filter]
+smalltest <- test[,na_filter]
+```
+
+
+###partition for cross validation
+```{r}
+samples <- createDataPartition(y=train$classe, p=0.75, list=FALSE)
+
+subTraining <- smalltrain[samples, ] 
+subTesting <- smalltrain[-samples, ]
+```
+
+
+###exploratory analysis
+```{r}
+plot(subTraining$classe)
+
+```
+
+All classes are almost evenly represented except for the class A which is slightly higher
+
+##Predictions
+We will use decision tree and random forest as prediction models and then compare them
+
+###Decision tree
+####Model
+```{r}
+treeFit <- rpart(classe ~ ., data = subTraining, method="class")
+fancyRpartPlot(treeFit)
+```
+
+####Prediction
+```{r}
+predictionTree<- predict(treeFit, subTesting, type = "class")
+
+confusionMatrix(predictionTree, subTesting$classe)$overall['Accuracy']
+```
+
+
+###Random Forest
+####Model
+```{r}
+forrestFit <- randomForest(classe ~. , data=subTraining)
+```
+
+####Prediction
+```{r}
+predictionForrest<- predict(forrestFit, subTesting, type = "class")
+
+confusionMatrix(predictionForrest, subTesting$classe)$overall['Accuracy']
+```
+
+
+###Conclusion
+The decition tree has an Accuracy of 76% while the random forrest has an accuracy of 99%. As expected the prediction using the random forrest is the best and will be used for predicting the test set.
+
+##Predicting test set
+```{r}
+FinalPredict <- predict(forrestFit,smalltest, type="class")
+FinalPredict
+
+```
